@@ -10,9 +10,17 @@ import urllib
 
 # タイトルの設定
 st.title("あいのりタクシーアプリ_のりたく🚕👫")
+# 例のデータ
+example_data = {
+    "名前": ["山田太郎", "鈴木一郎"],
+    "住所": ["東京都北区赤羽南2丁目15", "東京都台東区浅草2丁目3-1"]
+}
+# データフレームとして表示
+sample_df = pd.DataFrame(example_data)
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
+st.dataframe(sample_df)
 
 if uploaded_file:
     # Excelファイルの読み込み
