@@ -19,9 +19,9 @@ example_data = {
 sample_df = pd.DataFrame(example_data)
 
 # ファイルアップロード
-st.table(sample_df)
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
-
+st.write('Excelファイルの例（名前、住所という列名にしてください）')
+st.table(sample_df)
 
 if uploaded_file:
     # Excelファイルの読み込み
