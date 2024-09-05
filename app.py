@@ -8,7 +8,7 @@ from sklearn.cluster import DBSCAN
 import time
 
 # タイトルの設定
-st.title("あいのりタクシーアプリdemo")
+st.title("あいのりタクシーアプリ -たくのり- ")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
@@ -17,11 +17,18 @@ if uploaded_file:
     # Excelファイルの読み込み
     df = pd.read_excel(uploaded_file)
     
-    
     # データの表示
     st.write("アップロードされたデータ:")
     st.write(df)
     
+    # 欠損値や不要な空白を処理
+    df = df.dropna(subset=['名前', '住所'])  # 名前と住所が欠損している行を削除
+    df['住所'] = df['住所'].str.strip()  # 住所の空白を除去
+    
+    # データの表示
+    st.write("クリーニングされたデータ:")
+    st.write(df)
+
     if st.button("結果を表示"):
         geolocator = Nominatim(user_agent="taxi_allocation")
 
@@ -46,34 +53,52 @@ if uploaded_file:
             else:
                 coords.append((None, None))
 
+        # デバッグ: 取得した座標を表示
+        st.write("取得した座標:")
+        st.write(coords)
+
         df['Latitude'] = [coord[0] for coord in coords]
         df['Longitude'] = [coord[1] for coord in coords]
 
         # 緯度経度の取得に失敗した行を除外
         df = df.dropna(subset=['Latitude', 'Longitude'])
 
-        # 距離行列の作成
-        coords = df[['Latitude', 'Longitude']].values
-        dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
+        # 有効なデータがあるか確認
+        if df.empty:
+            st.error("有効な住所がありませんでした。すべての住所がジオコーディングに失敗しました。")
+        else:
+            # 距離行列の作成
+            coords = df[['Latitude', 'Longitude']].values
 
-        # DBSCANでクラスタリング
-        epsilon = 2  # 2km以内の点を同じクラスタと見なす
-        dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
-        clusters = dbscan.fit_predict(dist_matrix)
+            if len(coords) < 2:
+                st.error("十分な座標データがありません。クラスタリングには少なくとも2つの有効な座標が必要です。")
+            else:
+                dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
 
-        df['Cluster'] = clusters
+                # デバッグ: 距離行列を表示
+                st.write("距離行列:")
+                st.write(dist_matrix)
 
-        # 結果の表示
-        st.write("クラスタリング結果:")
-        for cluster_id in df['Cluster'].unique():
-            cluster_group = df[df['Cluster'] == cluster_id]
-            st.write(f"**クラスタ {cluster_id}**")
-            st.write(cluster_group[['名前', '住所']])
-        
-        # 結果をエクセルファイルとしてダウンロード
-        output = st.button("結果をエクセルファイルとしてダウンロード")
-        if output:
-            output_df = df[['名前', '住所', 'Cluster']]
-            output_df.to_excel("クラスタリング結果.xlsx", index=False)
-            st.write("結果をエクセルファイルとして保存しました。")
+                # DBSCANでクラスタリング
+                if dist_matrix.size > 0:
+                    epsilon = 2  # 2km以内の点を同じクラスタと見なす
+                    dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
+                    clusters = dbscan.fit_predict(dist_matrix)
 
+                    df['Cluster'] = clusters
+
+                    # 結果の表示
+                    st.write("クラスタリング結果:")
+                    for cluster_id in df['Cluster'].unique():
+                        cluster_group = df[df['Cluster'] == cluster_id]
+                        st.write(f"**クラスタ {cluster_id}**")
+                        st.write(cluster_group[['名前', '住所']])
+                    
+                    # 結果をエクセルファイルとしてダウンロード
+                    output = st.button("結果をエクセルファイルとしてダウンロード")
+                    if output:
+                        output_df = df[['名前', '住所', 'Cluster']]
+                        output_df.to_excel("クラスタリング結果.xlsx", index=False)
+                        st.write("結果をエクセルファイルとして保存しました。")
+                else:
+                    st.error("距離行列が空です。クラスタリングを実行できませんでした。")
