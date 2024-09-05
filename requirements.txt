@@ -3,3 +3,4 @@ pandas
 geopy
 scikit-learn
 openpyxl
+googletrans
