@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from geopy.geocoders import Nominatim
 from googletrans import Translator
-from geopy.exc import GeocoderTimedOut
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from geopy.distance import geodesic
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -10,7 +10,7 @@ import time
 import io
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ")
+st.title("あいのりタクシーアプリ4")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
@@ -29,18 +29,18 @@ if uploaded_file:
         return translated.text
 
     # ジオコーダの設定
-    geolocator = Nominatim(user_agent="taxi_allocation")
+    geolocator = Nominatim(user_agent="taxi_allocation", timeout=10)  # タイムアウトを10秒に設定
 
     def geocode_with_retry(address, retries=5, delay=3):
         for attempt in range(retries):
             try:
                 return geolocator.geocode(address)
-            except GeocoderTimedOut:
+            except (GeocoderTimedOut, GeocoderUnavailable) as e:
                 if attempt < retries - 1:
-                    st.write(f"Timeout occurred. Retrying ({attempt + 1}/{retries})...")
-                    time.sleep(delay)
+                    print(f"Error: {e}. Retrying ({attempt + 1}/{retries})...")
+                    time.sleep(delay)  # リトライ前に待機
                 else:
-                    st.write(f"Failed to geocode address after {retries} attempts: {address}")
+                    print(f"Failed to geocode address after {retries} attempts: {address}")
                     return None
 
     # プログレスバーの設定
@@ -52,8 +52,8 @@ if uploaded_file:
     people = []
     for index, row in df.iterrows():
         person = {
-            "name": row["name"],  # Excelの列名が"name"と仮定しています
-            "address": row["address"]  # Excelの列名が"address"と仮定しています
+            "name": row["名前"],  # Excelの列名が"name"と仮定しています
+            "address": row["住所"]  # Excelの列名が"address"と仮定しています
         }
         translated_address = translate_address(person["address"])
         location = geocode_with_retry(translated_address)
