@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from geopy.geocoders import Nominatim
-from googletrans import Translator
+from google.cloud import translate_v2 as translate
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from geopy.distance import geodesic
 import numpy as np
@@ -10,7 +10,7 @@ import time
 import io
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ4")
+st.title("あいのりタクシーアプリv5")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
@@ -21,12 +21,11 @@ if uploaded_file:
     st.write("アップロードされたデータ:")
     st.write(df)
     
-    # Google Translate APIを使用して住所を英語に翻訳
-    translator = Translator()
-
+    # Google Cloud Translation APIクライアントの設定
     def translate_address(address):
-        translated = translator.translate(address, src='ja', dest='en')
-        return translated.text
+        client = translate.Client()
+        result = client.translate(address, target_language='en', source_language='ja')
+        return result['translatedText']
 
     # ジオコーダの設定
     geolocator = Nominatim(user_agent="taxi_allocation", timeout=10)  # タイムアウトを10秒に設定
