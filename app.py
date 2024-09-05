@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ")
+st.title("あいのりタクシーアプリdemo")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
