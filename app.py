@@ -9,7 +9,7 @@ import requests
 import urllib
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_のりたく🚕👫")
+st.title("あいのりタクシーアプリ_タクとも🚕👫")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("Excelファイル（1列目に名前、2列目に住所）をアップロードしてください", type=["xlsx"])
