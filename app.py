@@ -1,14 +1,16 @@
 import streamlit as st
 import pandas as pd
 from geopy.geocoders import Nominatim
+from googletrans import Translator
 from geopy.exc import GeocoderTimedOut
 from geopy.distance import geodesic
 import numpy as np
 from sklearn.cluster import DBSCAN
 import time
+import io
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ -たくのり- ")
+st.title("あいのりタクシーアプリ")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
@@ -16,89 +18,96 @@ uploaded_file = st.file_uploader("名前と住所が記載されたExcelファ�
 if uploaded_file:
     # Excelファイルの読み込み
     df = pd.read_excel(uploaded_file)
-    
-    # データの表示
     st.write("アップロードされたデータ:")
     st.write(df)
     
-    # 欠損値や不要な空白を処理
-    df = df.dropna(subset=['名前', '住所'])  # 名前と住所が欠損している行を削除
-    df['住所'] = df['住所'].str.strip()  # 住所の空白を除去
-    
-    # データの表示
-    st.write("クリーニングされたデータ:")
-    st.write(df)
+    # Google Translate APIを使用して住所を英語に翻訳
+    translator = Translator()
 
-    if st.button("結果を表示"):
-        geolocator = Nominatim(user_agent="taxi_allocation")
+    def translate_address(address):
+        translated = translator.translate(address, src='ja', dest='en')
+        return translated.text
 
-        def geocode_with_retry(address, retries=5, delay=3):
-            for attempt in range(retries):
-                try:
-                    return geolocator.geocode(address)
-                except GeocoderTimedOut:
-                    if attempt < retries - 1:
-                        st.write(f"Timeout occurred. Retrying ({attempt + 1}/{retries})...")
-                        time.sleep(delay)
-                    else:
-                        st.write(f"Failed to geocode address after {retries} attempts: {address}")
-                        return None
+    # ジオコーダの設定
+    geolocator = Nominatim(user_agent="taxi_allocation")
 
-        # 住所のジオコーディング
-        coords = []
-        for address in df['住所']:
-            location = geocode_with_retry(address)
-            if location:
-                coords.append((location.latitude, location.longitude))
-            else:
-                coords.append((None, None))
-
-        # デバッグ: 取得した座標を表示
-        st.write("取得した座標:")
-        st.write(coords)
-
-        df['Latitude'] = [coord[0] for coord in coords]
-        df['Longitude'] = [coord[1] for coord in coords]
-
-        # 緯度経度の取得に失敗した行を除外
-        df = df.dropna(subset=['Latitude', 'Longitude'])
-
-        # 有効なデータがあるか確認
-        if df.empty:
-            st.error("有効な住所がありませんでした。すべての住所がジオコーディングに失敗しました。")
-        else:
-            # 距離行列の作成
-            coords = df[['Latitude', 'Longitude']].values
-
-            if len(coords) < 2:
-                st.error("十分な座標データがありません。クラスタリングには少なくとも2つの有効な座標が必要です。")
-            else:
-                dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
-
-                # デバッグ: 距離行列を表示
-                st.write("距離行列:")
-                st.write(dist_matrix)
-
-                # DBSCANでクラスタリング
-                if dist_matrix.size > 0:
-                    epsilon = 2  # 2km以内の点を同じクラスタと見なす
-                    dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
-                    clusters = dbscan.fit_predict(dist_matrix)
-
-                    df['Cluster'] = clusters
-
-                    # 結果の表示
-                    st.write("クラスタリング結果:")
-                    for cluster_id in df['Cluster'].unique():
-                        cluster_group = df[df['Cluster'] == cluster_id]
-                        st.write(f"**クラスタ {cluster_id}**")
-                        st.write(cluster_group[['名前', '住所']])
-                    
-                    # 結果をエクセルファイルとしてダウンロード
-                    output = st.button("結果をエクセルファイルとしてダウンロード")
-                    if output:
-                        output_df = df[['名前', '住所', 'Cluster']]
-                        output_df.to_excel("クラスタリング結果.xlsx", index=False)
-                        st.write("結果をエクセルファイルとして保存しました。")
+    def geocode_with_retry(address, retries=5, delay=3):
+        for attempt in range(retries):
+            try:
+                return geolocator.geocode(address)
+            except GeocoderTimedOut:
+                if attempt < retries - 1:
+                    st.write(f"Timeout occurred. Retrying ({attempt + 1}/{retries})...")
+                    time.sleep(delay)
                 else:
-                    st.error("距離行列が空です。クラスタリングを実行できませんでした。")
+                    st.write(f"Failed to geocode address after {retries} attempts: {address}")
+                    return None
+
+    # Excelファイルから住所データを取得して処理
+    people = []
+    for index, row in df.iterrows():
+        person = {
+            "name": row["name"],  # Excelの列名が"name"と仮定しています
+            "address": row["address"]  # Excelの列名が"address"と仮定しています
+        }
+        translated_address = translate_address(person["address"])
+        location = geocode_with_retry(translated_address)
+        if location:
+            person["coords"] = (location.latitude, location.longitude)
+        else:
+            st.write(f"Error: Could not geocode address for {person['name']} - {translated_address}")
+            person["coords"] = None  # 座標が見つからなかった場合
+        people.append(person)
+
+    # 座標が取得できた人のみを対象にする
+    people_with_coords = [person for person in people if person["coords"]]
+
+    # 座標のリストを作成
+    coords = [person["coords"] for person in people_with_coords]
+
+    # 距離行列を計算
+    dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
+
+    # DBSCANでクラスタリング
+    epsilon = 3  # 3km以内の点を同じクラスタと見なす
+    dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
+    clusters = dbscan.fit_predict(dist_matrix)
+
+    # グループ分け
+    groups = {}
+    for idx, cluster_id in enumerate(clusters):
+        if cluster_id != -1:  # -1はノイズ（どのクラスタにも属さない）
+            if cluster_id not in groups:
+                groups[cluster_id] = []
+            groups[cluster_id].append(people_with_coords[idx])
+
+    # 残ったノイズの処理（個別タクシー）
+    noise = [people_with_coords[idx] for idx, cluster_id in enumerate(clusters) if cluster_id == -1]
+    for person in noise:
+        groups[len(groups)] = [person]
+
+    # タクシー割り当て
+    taxis = []
+    for group in groups.values():
+        for i in range(0, len(group), 3):
+            taxis.append(group[i:i+3])  # 最大3人までのグループをタクシーに割り当て
+
+    # 結果を表示
+    result_data = []
+    for i, taxi in enumerate(taxis):
+        st.write(f"Taxi {i + 1}:")
+        for passenger in taxi:
+            st.write(f"  {passenger['name']} - {passenger['address']}")
+            result_data.append({
+                "Taxi": i + 1,
+                "Name": passenger['name'],
+                "Address": passenger['address']
+            })
+
+    # 結果をエクセルファイルとして出力
+    if st.button("結果をエクセルファイルとしてダウンロード"):
+        result_df = pd.DataFrame(result_data)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            result_df.to_excel(writer, index=False, sheet_name='Taxis')
+        st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
