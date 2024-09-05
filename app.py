@@ -1,14 +1,10 @@
 import streamlit as st
 import pandas as pd
-from geopy.geocoders import Nominatim
 from googletrans import Translator
-from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from geopy.distance import geodesic
 import numpy as np
 from sklearn.cluster import DBSCAN
-import time
 import io
-import geocoder
 import requests
 import urllib
 
