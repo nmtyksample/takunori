@@ -7,6 +7,7 @@ from sklearn.cluster import DBSCAN
 import io
 import requests
 import urllib
+import re
 
 # タイトルの設定
 st.title("あいのりタクシーアプリ_タクとも🚕👫")
@@ -104,6 +105,20 @@ if uploaded_file:
                     "Name": passenger['name'],
                     "Address": passenger['address']
                 })
+        
+        # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
+        def extract_area(address):
+            match = re.search(r'(\S+区|\S+町|\S+市)', address)
+            if match:
+                return match.group(1)
+            return None
+
+        # 並び替えのロジックを追加
+        for passenger in result_data:
+            passenger["Area"] = extract_area(passenger["Address"])
+
+        # Taxiごとに並び替え（「Taxi」->「Area」）
+        result_data_sorted = sorted(result_data, key=lambda x: (x["Taxi"], x["Area"]))
 
         # 結果をエクセルファイルとして出力
         if st.button("結果をエクセルファイルとしてダウンロード"):
