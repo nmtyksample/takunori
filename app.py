@@ -19,7 +19,7 @@ example_data = {
 sample_df = pd.DataFrame(example_data)
 
 # ファイルアップロード
-st.dataframe(sample_df)
+st.table(sample_df)
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
 
 
