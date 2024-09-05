@@ -5,6 +5,7 @@ from geopy.exc import GeocoderTimedOut
 from geopy.distance import geodesic
 import numpy as np
 from sklearn.cluster import DBSCAN
+import time
 
 # タイトルの設定
 st.title("あいのりタクシーアプリdemo")
