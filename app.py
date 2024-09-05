@@ -122,7 +122,7 @@ if uploaded_file:
 
         # 結果をエクセルファイルとして出力
         if st.button("結果をエクセルファイルとしてダウンロード"):
-            result_df = pd.DataFrame(result_data)
+            result_df = pd.DataFrame(result_data_sorted)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 result_df.to_excel(writer, index=False, sheet_name='Taxis')
