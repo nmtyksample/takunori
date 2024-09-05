@@ -71,7 +71,7 @@ if uploaded_file:
         dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
 
         # DBSCANでクラスタリング
-        epsilon = 2  # 3km以内の点を同じクラスタと見なす
+        epsilon = 2  # 2km以内の点を同じクラスタと見なす
         dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
         clusters = dbscan.fit_predict(dist_matrix)
 
@@ -97,9 +97,9 @@ if uploaded_file:
         # 結果を表示
         result_data = []
         for i, taxi in enumerate(taxis):
-            st.write(f"Taxi {i + 1}:")
+            # st.write(f"Taxi {i + 1}:")
             for passenger in taxi:
-                st.write(f"  {passenger['name']} - {passenger['address']}")
+                # st.write(f"  {passenger['name']} - {passenger['address']}")
                 result_data.append({
                     "Taxi": i + 1,
                     "Name": passenger['name'],
