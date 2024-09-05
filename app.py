@@ -9,7 +9,7 @@ import requests
 import urllib
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_のりたく_国土地理院版")
+st.title("あいのりタクシーアプリ_のりたく🚕👫")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
@@ -17,18 +17,6 @@ uploaded_file = st.file_uploader("名前と住所が記載されたExcelファ�
 if uploaded_file:
     # Excelファイルの読み込み
     df = pd.read_excel(uploaded_file)
-    st.write("アップロードされたデータ:")
-    st.write(df)
-    
-    # Google Translate APIを使用して住所を英語に翻訳
-    translator = Translator()
-
-    def translate_address(address):
-        translated = translator.translate(address, src='ja', dest='en')
-        return translated.text
-
-    # ジオコーダの設定
-    # geolocator = Nominatim(user_agent="taxi_allocation", timeout=10)  # タイムアウトを10秒に設定
 
     def geocode_with_retry(address):
         makeUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
@@ -56,7 +44,6 @@ if uploaded_file:
             "name": row["名前"],  # Excelの列名が"name"と仮定しています
             "address": row["住所"]  # Excelの列名が"address"と仮定しています
         }
-        # translated_address = translate_address(person["address"])
         location = geocode_with_retry(person["address"])
         if location:
             person["coords"] = (location[1], location[0])
