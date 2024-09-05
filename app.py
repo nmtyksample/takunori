@@ -10,18 +10,10 @@ import urllib
 
 # タイトルの設定
 st.title("あいのりタクシーアプリ_のりたく🚕👫")
-# 例のデータ
-example_data = {
-    "名前": ["山田太郎", "鈴木一郎"],
-    "住所": ["東京都北区赤羽南2丁目15", "東京都台東区浅草2丁目3-1"]
-}
-# データフレームとして表示
-sample_df = pd.DataFrame(example_data)
 
 # ファイルアップロード
-uploaded_file = st.file_uploader("名前と住所が記載されたExcelファイルをアップロードしてください", type=["xlsx"])
-st.write('Excelファイルの例（名前、住所という列名にしてください）')
-st.table(sample_df)
+uploaded_file = st.file_uploader("Excelファイル（1列目に名前、2列目に住所）をアップロードしてください", type=["xlsx"])
+
 
 if uploaded_file:
     # Excelファイルの読み込み
@@ -50,8 +42,8 @@ if uploaded_file:
     people = []
     for index, row in df.iterrows():
         person = {
-            "name": row["名前"],  # Excelの列名が"name"と仮定しています
-            "address": row["住所"]  # Excelの列名が"address"と仮定しています
+            "name": row.iloc[0],  
+            "address": row.iloc[1]  
         }
         location = geocode_with_retry(person["address"])
         if location:
