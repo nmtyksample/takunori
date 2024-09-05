@@ -8,6 +8,9 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 import time
 import io
+import geocoder
+import requests
+import urllib
 
 # タイトルの設定
 st.title("あいのりタクシーアプリ4")
@@ -29,19 +32,21 @@ if uploaded_file:
         return translated.text
 
     # ジオコーダの設定
-    geolocator = Nominatim(user_agent="taxi_allocation", timeout=10)  # タイムアウトを10秒に設定
+    # geolocator = Nominatim(user_agent="taxi_allocation", timeout=10)  # タイムアウトを10秒に設定
 
-    def geocode_with_retry(address, retries=5, delay=3):
-        for attempt in range(retries):
-            try:
-                return geolocator.geocode(address)
-            except (GeocoderTimedOut, GeocoderUnavailable) as e:
-                if attempt < retries - 1:
-                    print(f"Error: {e}. Retrying ({attempt + 1}/{retries})...")
-                    time.sleep(delay)  # リトライ前に待機
-                else:
-                    print(f"Failed to geocode address after {retries} attempts: {address}")
-                    return None
+    def geocode_with_retry(address):
+        makeUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
+        s_quote = urllib.parse.quote(address)
+        response = requests.get(makeUrl + s_quote)
+        if response.status_code == 200:
+            data = response.json()
+        if data:
+            # 緯度経度を取得
+            coordinates = data[0]["geometry"]["coordinates"]
+            return coordinates  # GSIは経度、緯度の順で返すことが多い
+        else:
+            print("住所が見つかりませんでした。")
+            return None, None
 
     # プログレスバーの設定
     progress_bar = st.progress(0)
@@ -55,12 +60,12 @@ if uploaded_file:
             "name": row["名前"],  # Excelの列名が"name"と仮定しています
             "address": row["住所"]  # Excelの列名が"address"と仮定しています
         }
-        translated_address = translate_address(person["address"])
-        location = geocode_with_retry(translated_address)
+        # translated_address = translate_address(person["address"])
+        location = geocode_with_retry(person["address"])
         if location:
-            person["coords"] = (location.latitude, location.longitude)
+            person["coords"] = (location[1], location[0])
         else:
-            st.write(f"Error: Could not geocode address for {person['name']} - {translated_address}")
+            st.write(f"Error: Could not geocode address for {person['name']} - {person['address']}")
             person["coords"] = None  # 座標が見つからなかった場合
         people.append(person)
 
