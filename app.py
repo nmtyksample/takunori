@@ -59,7 +59,7 @@ def is_valid_coordinates(coords):
     if coords is None:
         return False
     # 緯度と経度を正しい順序で出力
-    latitude, longitude = coords[1], coords[0]
+    latitude, longitude = coords[0], coords[1]
     st.write(f"Checking coordinates: 緯度: {latitude}, 経度: {longitude}")  # 正しい順序でデバッグ出力
     return -90 <= latitude <= 90 and -180 <= longitude <= 180
 
