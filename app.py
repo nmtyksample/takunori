@@ -128,4 +128,56 @@ if uploaded_file and start_address:
 
             # 住所が見つからなかった人は1人で1台のタクシーを使用
             for person in people_without_coords:
-                groups[len(groups)] = [perso
+                groups[len(groups)] = [person]
+
+            # タクシー割り当て
+            taxis = []
+            for group in groups.values():
+                for i in range(0, len(group), 3):
+                    taxis.append(group[i:i+3])  # 最大3人までのグループをタクシーに割り当て
+
+            # 結果を表示
+            result_data = []
+            for i, taxi in enumerate(taxis):
+                for passenger in taxi:
+                    # タクシー料金を計算
+                    if passenger["coords"]:
+                        distance = geodesic(start_coords, passenger["coords"]).km
+                        taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
+                        if taxi_fee_midnight:
+                            result_data.append({
+                                "Taxi": i + 1,
+                                "Name": passenger['name'],
+                                "Address": passenger['address'],
+                                "Taxi Fee (Normal)": f"{taxi_fee}円",
+                                "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円"
+                            })
+                        else:
+                            result_data.append({
+                                "Taxi": i + 1,
+                                "Name": passenger['name'],
+                                "Address": passenger['address'],
+                                "Taxi Fee (Normal)": f"{taxi_fee}円",
+                                "Taxi Fee (Midnight)": "N/A"
+                            })
+                    else:
+                        result_data.append({
+                            "Taxi": i + 1,
+                            "Name": passenger['name'],
+                            "Address": passenger['address'],
+                            "Taxi Fee (Normal)": "N/A",
+                            "Taxi Fee (Midnight)": "N/A"
+                        })
+
+            # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
+            def extract_area(address):
+                match = re.search(r'(\S+区|\S+町|\S+市)', address)
+                if match:
+                    return match.group(1)
+                return None
+
+            # 並び替えのロジックを追加
+            for passenger in result_data:
+                passenger["Area"] = extract_area(passenger["Address"])
+
+            # Taxiごとに並び替え（「Taxi」->
