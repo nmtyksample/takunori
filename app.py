@@ -28,7 +28,7 @@ def geocode_with_retry(address):
         if data:
             # 緯度経度を取得
             coordinates = data[0]["geometry"]["coordinates"]
-            st.write(f"{address}の座標: {coordinates}")  # デバッグ出力
+            st.write(f"{address} の座標: {coordinates}")  # デバッグ出力
             return coordinates  # GSIは経度、緯度の順で返すことが多い
         else:
             st.write(f"住所 '{address}' が見つかりませんでした。")
