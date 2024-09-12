@@ -60,7 +60,8 @@ def is_valid_coordinates(coords):
     if coords is None:
         return False
     # GSIから返される座標は経度、緯度の順なので、それを考慮して変換
-    longitude, latitude = coords  # GSIの座標は経度、緯度の順で返される
+    # longitude, latitude = coords  # GSIの座標は経度、緯度の順で返される
+    latitude, longitude = coords  # GSIの座標は経度、緯度の順で返される
     st.write(f"Checking coordinates: 緯度: {latitude}, 経度: {longitude}")  # デバッグ出力
     # 緯度が-90から90、経度が-180から180の範囲内であることを確認
     return -90 <= latitude <= 90 and -180 <= longitude <= 180
