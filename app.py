@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも2🚕👫")
+st.title("あいのりタクシーアプリ_タクとも🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -140,44 +140,9 @@ if uploaded_file and start_address:
             result_data = []
             for i, taxi in enumerate(taxis):
                 for passenger in taxi:
-                    # タクシー料金を計算
-                    if passenger["coords"]:
+                    # 座標が有効か確認
+                    if passenger["coords"] and -90 <= passenger["coords"][0] <= 90 and -180 <= passenger["coords"][1] <= 180:
                         distance = geodesic(start_coords, passenger["coords"]).km
                         taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
                         if taxi_fee_midnight:
-                            result_data.append({
-                                "Taxi": i + 1,
-                                "Name": passenger['name'],
-                                "Address": passenger['address'],
-                                "Taxi Fee (Normal)": f"{taxi_fee}円",
-                                "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円"
-                            })
-                        else:
-                            result_data.append({
-                                "Taxi": i + 1,
-                                "Name": passenger['name'],
-                                "Address": passenger['address'],
-                                "Taxi Fee (Normal)": f"{taxi_fee}円",
-                                "Taxi Fee (Midnight)": "N/A"
-                            })
-                    else:
-                        result_data.append({
-                            "Taxi": i + 1,
-                            "Name": passenger['name'],
-                            "Address": passenger['address'],
-                            "Taxi Fee (Normal)": "N/A",
-                            "Taxi Fee (Midnight)": "N/A"
-                        })
-
-            # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
-            def extract_area(address):
-                match = re.search(r'(\S+区|\S+町|\S+市)', address)
-                if match:
-                    return match.group(1)
-                return None
-
-            # 並び替えのロジックを追加
-            for passenger in result_data:
-                passenger["Area"] = extract_area(passenger["Address"])
-
-            # Taxiごとに並び替え（「Taxi」->
+                            result_data
