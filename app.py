@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも16🚕👫")
+st.title("あいのりタクシーアプリ_タクとも17🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -59,9 +59,9 @@ def calculate_taxi_fare(distance_km, current_time=None):
 def is_valid_coordinates(coords):
     if coords is None:
         return False
-    # 経度、緯度を表示してデバッグ
-    longitude, latitude = coords  
-    st.write(f"Checking coordinates: 緯度: {latitude}, 経度: {longitude}")  # デバッグ出力
+    # GSIから返される座標は経度、緯度の順なので、それを考慮して変換
+    longitude, latitude = coords  # GSIの座標は経度、緯度の順で返される
+    st.write(f"Checking coordinates: 経度: {longitude}, 緯度: {latitude}")  # デバッグ出力
     # 緯度が-90から90、経度が-180から180の範囲内であることを確認
     return -90 <= latitude <= 90 and -180 <= longitude <= 180
 
@@ -168,60 +168,4 @@ if uploaded_file and start_address:
                         distance = geodesic(start_coords, passenger["coords"]).km
                         st.write(f"{passenger['name']}との距離: {distance} km")  # デバッグ出力
                         taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
-                        st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ出力
-                        if taxi_fee_midnight:
-                            result_data.append({
-                                "Taxi": i + 1,
-                                "Name": passenger['name'],
-                                "Address": passenger['address'],
-                                "Taxi Fee (Normal)": f"{taxi_fee}円",
-                                "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円"
-                            })
-                        else:
-                            result_data.append({
-                                "Taxi": i + 1,
-                                "Name": passenger['name'],
-                                "Address": passenger['address'],
-                                "Taxi Fee (Normal)": f"{taxi_fee}円",
-                                "Taxi Fee (Midnight)": "N/A"
-                            })
-                    except Exception as e:
-                        st.write(f"Error calculating distance or fare for {passenger['name']}: {e}")  # デバッグ用エラーログ
-                        result_data.append({
-                            "Taxi": i + 1,
-                            "Name": passenger['name'],
-                            "Address": passenger['address'],
-                            "Taxi Fee (Normal)": "N/A",
-                            "Taxi Fee (Midnight)": "N/A"
-                        })
-                else:
-                    st.write(f"Invalid coordinates for {passenger['name']}: {passenger['coords']}")  # デバッグ出力
-                    result_data.append({
-                        "Taxi": i + 1,
-                        "Name": passenger['name'],
-                        "Address": passenger['address'],
-                        "Taxi Fee (Normal)": "N/A",
-                        "Taxi Fee (Midnight)": "N/A"
-                    })
-
-        # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
-        def extract_area(address):
-            match = re.search(r'(\S+区|\S+町|\S+市)', address)
-            if match:
-                return match.group(1)
-            return None
-
-        # 並び替えのロジックを追加
-        for passenger in result_data:
-            passenger["Area"] = extract_area(passenger["Address"])
-
-        # Taxiごとに並び替え（「Taxi」->「Area」）
-        result_data_sorted = sorted(result_data, key=lambda x: (x["Taxi"], x["Area"]))
-
-        # 結果をエクセルファイルとして出力
-        if st.button("結果をエクセルファイルとしてダウンロード"):
-            result_df = pd.DataFrame(result_data_sorted)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                result_df.to_excel(writer, index=False, sheet_name='Taxis')
-            st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
+                        st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ
