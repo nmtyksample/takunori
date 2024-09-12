@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも14🚕👫")
+st.title("あいのりタクシーアプリ_タクとも15🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -100,7 +100,7 @@ if uploaded_file and start_address:
         }
         location = geocode_with_retry(person["address"])
         if is_valid_coordinates(location):
-            person["coords"] = (location[1], location[0])  # 緯度、経度に変換
+            person["coords"] = (location[1], location[0])  # 経度、緯度を緯度、経度に変換
         else:
             st.write(f"Error: Could not geocode address for {person['name']} - {person['address']}")
             person["coords"] = None  # 座標が見つからなかった場合
@@ -122,7 +122,7 @@ if uploaded_file and start_address:
     else:
         # 距離行列を計算
         if len(coords) >= 2:
-            dist_matrix = np.array([[geodesic((c1[1], c1[0]), (c2[1], c2[0])).km for c2 in coords] for c1 in coords])
+            dist_matrix = np.array([[geodesic(c1, c2).km for c2 in coords] for c1 in coords])
 
             # DBSCANでクラスタリング
             epsilon = 2  # 2km以内の点を同じクラスタと見なす
@@ -162,7 +162,7 @@ if uploaded_file and start_address:
                 # 座標が有効か確認
                 if is_valid_coordinates(passenger["coords"]):
                     try:
-                        distance = geodesic((start_coords[1], start_coords[0]), (passenger["coords"][1], passenger["coords"][0])).km
+                        distance = geodesic(start_coords, passenger["coords"]).km
                         st.write(f"{passenger['name']}との距離: {distance} km")  # デバッグ出力
                         taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
                         st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ出力
