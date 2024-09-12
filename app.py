@@ -29,10 +29,10 @@ def geocode_with_retry(address):
             coordinates = data[0]["geometry"]["coordinates"]
             return coordinates  # GSIは経度、緯度の順で返すことが多い
         else:
-            st.write(f"住所 '{address}' が見つかりませんでした。")
+            st.write(f"住所 '{address}' が見つかりませんでした。住所の表記が正しいか確認してください（例: '〇〇市〇〇区' の形式）。")
             return None, None
     else:
-        st.write("APIリクエストに失敗しました。")
+        st.write("APIリクエストに失敗しました。インターネット接続やAPIの状態を確認してください。")
         return None, None
 
 if uploaded_file and start_address:
@@ -70,32 +70,41 @@ if uploaded_file and start_address:
 
         # 座標が取得できた人のみを対象にする
         people_with_coords = [person for person in people if person["coords"]]
+        people_without_coords = [person for person in people if person["coords"] is None]
 
         # 座標のリストを作成
         coords = [person["coords"] for person in people_with_coords]
 
-        if len(coords) < 2:
+        if len(coords) < 2 and len(people_without_coords) == 0:
             st.error("十分な住所データが取得できませんでした。")
         else:
             # 距離行列を計算
-            dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
+            if len(coords) >= 2:
+                dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
 
-            # DBSCANでクラスタリング
-            epsilon = 2  # 2km以内の点を同じクラスタと見なす
-            dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
-            clusters = dbscan.fit_predict(dist_matrix)
+                # DBSCANでクラスタリング
+                epsilon = 2  # 2km以内の点を同じクラスタと見なす
+                dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
+                clusters = dbscan.fit_predict(dist_matrix)
 
-            # グループ分け
-            groups = {}
-            for idx, cluster_id in enumerate(clusters):
-                if cluster_id != -1:  # -1はノイズ（どのクラスタにも属さない）
-                    if cluster_id not in groups:
-                        groups[cluster_id] = []
-                    groups[cluster_id].append(people_with_coords[idx])
+                # グループ分け
+                groups = {}
+                for idx, cluster_id in enumerate(clusters):
+                    if cluster_id != -1:  # -1はノイズ（どのクラスタにも属さない）
+                        if cluster_id not in groups:
+                            groups[cluster_id] = []
+                        groups[cluster_id].append(people_with_coords[idx])
 
-            # 残ったノイズの処理（個別タクシー）
-            noise = [people_with_coords[idx] for idx, cluster_id in enumerate(clusters) if cluster_id == -1]
-            for person in noise:
+                # 残ったノイズの処理（個別タクシー）
+                noise = [people_with_coords[idx] for idx, cluster_id in enumerate(clusters) if cluster_id == -1]
+                for person in noise:
+                    groups[len(groups)] = [person]
+
+            else:
+                groups = {}  # 座標がない場合の処理
+
+            # 住所が見つからなかった人は1人で1台のタクシーを使用
+            for person in people_without_coords:
                 groups[len(groups)] = [person]
 
             # タクシー割り当て
