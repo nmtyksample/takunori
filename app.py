@@ -1,101 +1,127 @@
+import streamlit as st
+import pandas as pd
+from googletrans import Translator
+from geopy.distance import geodesic
+import numpy as np
+from sklearn.cluster import DBSCAN
+import io
 import requests
-import urllib.parse
-from geopy.distance import geodesic  # 距離計算用のライブラリ
-from datetime import datetime
+import urllib
+import re
 
-# GSI APIを使用して緯度経度を取得する関数
-def geocode_with_retry(address):
-    makeUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
-    s_quote = urllib.parse.quote(address)
-    response = requests.get(makeUrl + s_quote)
-    if response.status_code == 200:
-        data = response.json()
+# タイトルの設定
+st.title("あいのりタクシーアプリ_タクとも🚕👫")
+
+# ファイルアップロード
+uploaded_file = st.file_uploader("Excelファイル（1列目に名前、2列目に住所）をアップロードしてください", type=["xlsx"])
+
+
+if uploaded_file:
+    # Excelファイルの読み込み
+    df = pd.read_excel(uploaded_file)
+
+    def geocode_with_retry(address):
+        makeUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
+        s_quote = urllib.parse.quote(address)
+        response = requests.get(makeUrl + s_quote)
+        if response.status_code == 200:
+            data = response.json()
         if data:
             # 緯度経度を取得
             coordinates = data[0]["geometry"]["coordinates"]
-            return coordinates  # GSIは経度、緯度の順で返す
+            return coordinates  # GSIは経度、緯度の順で返すことが多い
         else:
             print("住所が見つかりませんでした。")
             return None, None
+
+    # プログレスバーの設定
+    progress_bar = st.progress(0)
+    total_steps = len(df)  # 全ステップ数はデータ行数
+    current_step = 0
+
+    # Excelファイルから住所データを取得して処理
+    people = []
+    for index, row in df.iterrows():
+        person = {
+            "name": row.iloc[0],  
+            "address": row.iloc[1]  
+        }
+        location = geocode_with_retry(person["address"])
+        if location:
+            person["coords"] = (location[1], location[0])
+        else:
+            st.write(f"Error: Could not geocode address for {person['name']} - {person['address']}")
+            person["coords"] = None  # 座標が見つからなかった場合
+        people.append(person)
+
+        # プログレスバーの更新
+        current_step += 1
+        progress_bar.progress(current_step / total_steps)
+
+    # 座標が取得できた人のみを対象にする
+    people_with_coords = [person for person in people if person["coords"]]
+
+    # 座標のリストを作成
+    coords = [person["coords"] for person in people_with_coords]
+
+    if len(coords) < 2:
+        st.error("十分な住所データが取得できませんでした。")
     else:
-        print("APIリクエストに失敗しました。")
-        return None, None
+        # 距離行列を計算
+        dist_matrix = np.array([[geodesic(coord1, coord2).km for coord2 in coords] for coord1 in coords])
 
-# 距離を元にタクシー料金を計算する関数
-def calculate_taxi_fare(distance_km, current_time=None):
-    # タクシー料金の計算 (東京の例: 初乗り料金430円、以降の加算料金)
-    base_fare = 430  # 初乗り料金 (1.052kmまで)
-    additional_fare = 80  # 加算料金 (237mごとに80円)
-    additional_distance = max(0, distance_km - 1.052)  # 初乗りを超えた距離
-    additional_units = additional_distance / 0.237  # 237mごと
-    taxi_fee = base_fare + int(additional_units) * additional_fare  # 通常料金
+        # DBSCANでクラスタリング
+        epsilon = 2  # 2km以内の点を同じクラスタと見なす
+        dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
+        clusters = dbscan.fit_predict(dist_matrix)
 
-    # 深夜料金の計算 (22:00〜5:00の間は20%増し)
-    taxi_fee_midnight = taxi_fee * 1.2
+        # グループ分け
+        groups = {}
+        for idx, cluster_id in enumerate(clusters):
+            if cluster_id != -1:  # -1はノイズ（どのクラスタにも属さない）
+                if cluster_id not in groups:
+                    groups[cluster_id] = []
+                groups[cluster_id].append(people_with_coords[idx])
 
-    # 現在時刻の取得または指定された時間を使用
-    if current_time is None:
-        current_time = datetime.now()
+        # 残ったノイズの処理（個別タクシー）
+        noise = [people_with_coords[idx] for idx, cluster_id in enumerate(clusters) if cluster_id == -1]
+        for person in noise:
+            groups[len(groups)] = [person]
 
-    # 深夜料金が適用される場合は深夜料金も返す
-    if current_time.hour >= 22 or current_time.hour < 5:
-        return round(taxi_fee), round(taxi_fee_midnight)  # 両方の料金を返す
-    else:
-        return round(taxi_fee), None  # 通常料金のみ返す（深夜料金は適用されない）
+        # タクシー割り当て
+        taxis = []
+        for group in groups.values():
+            for i in range(0, len(group), 3):
+                taxis.append(group[i:i+3])  # 最大3人までのグループをタクシーに割り当て
 
-# 出発地点と複数の目的地から最も遠い地点を見つけて料金を計算
-def calculate_fare_from_start_to_farthest(start_address, destination_addresses):
-    start_coords = geocode_with_retry(start_address)
-    if not start_coords:
-        return "出発地点の座標が取得できませんでした"
+        # 結果を表示
+        result_data = []
+        for i, taxi in enumerate(taxis):
+            for passenger in taxi:
+                result_data.append({
+                    "Taxi": i + 1,
+                    "Name": passenger['name'],
+                    "Address": passenger['address']
+                })
+        
+        # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
+        def extract_area(address):
+            match = re.search(r'(\S+区|\S+町|\S+市)', address)
+            if match:
+                return match.group(1)
+            return None
 
-    max_distance = 0
-    max_destination = None
-    max_taxi_fee = 0
-    max_taxi_fee_midnight = 0
+        # 並び替えのロジックを追加
+        for passenger in result_data:
+            passenger["Area"] = extract_area(passenger["Address"])
 
-    # 目的地ごとに距離と料金を計算
-    for destination in destination_addresses:
-        dest_coords = geocode_with_retry(destination)
-        if not dest_coords:
-            print(f"{destination} の座標が取得できませんでした")
-            continue
+        # Taxiごとに並び替え（「Taxi」->「Area」）
+        result_data_sorted = sorted(result_data, key=lambda x: (x["Taxi"], x["Area"]))
 
-        # 緯度経度で距離を計算
-        distance_km = geodesic((start_coords[1], start_coords[0]), (dest_coords[1], dest_coords[0])).km
-
-        # 距離に基づいてタクシー料金を計算
-        taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance_km)
-
-        # 最も遠い地点を探す
-        if distance_km > max_distance:
-            max_distance = distance_km
-            max_destination = destination
-            max_taxi_fee = taxi_fee
-            max_taxi_fee_midnight = taxi_fee_midnight if taxi_fee_midnight else 0
-
-    # 結果を返す
-    return {
-        "最も遠い目的地": max_destination,
-        "通常料金": max_taxi_fee,
-        "深夜料金": max_taxi_fee_midnight if max_taxi_fee_midnight else "適用なし"
-    }
-
-# ユーザーから出発地点を入力
-start = input("出発地点の住所を入力してください: ")
-
-# ユーザーから目的地を複数入力
-destinations = []
-while True:
-    destination = input("目的地を入力してください (終了する場合はEnterを押してください): ")
-    if destination == "":
-        break
-    destinations.append(destination)
-
-# タクシー料金を計算
-fare_result = calculate_fare_from_start_to_farthest(start, destinations)
-
-# 結果を出力
-print(f"最も遠い目的地: {fare_result['最も遠い目的地']}")
-print(f"タクシー料金（通常料金）: {fare_result['通常料金']}円")
-print(f"タクシー料金（深夜料金）: {fare_result['深夜料金']}")
+        # 結果をエクセルファイルとして出力
+        if st.button("結果をエクセルファイルとしてダウンロード"):
+            result_df = pd.DataFrame(result_data_sorted)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                result_df.to_excel(writer, index=False, sheet_name='Taxis')
+            st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
