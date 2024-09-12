@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも🚕👫")
+st.title("あいのりタクシーアプリ_タクとも2🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -69,6 +69,7 @@ def get_start_coords(start_address):
         # デフォルトの座標（東京都渋谷区神南2-2-1）を取得
         default_address = "東京都渋谷区神南2-2-1"
         coords = geocode_with_retry(default_address)
+        st.write(coords)
         if not is_valid_coordinates(coords):
             st.error("デフォルトの座標も見つかりません。設定値を見直してください。")
             return None
