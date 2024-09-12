@@ -7,6 +7,7 @@ import io
 import requests
 import urllib
 import re
+from datetime import datetime
 
 # タイトルの設定
 st.title("あいのりタクシーアプリ_タクとも🚕👫")
@@ -34,6 +35,28 @@ def geocode_with_retry(address):
     else:
         st.write("APIリクエストに失敗しました。インターネット接続やAPIの状態を確認してください。")
         return None, None
+
+# タクシー料金計算の関数
+def calculate_taxi_fare(distance_km, current_time=None):
+    # タクシー料金の計算 (東京の例: 初乗り料金430円、以降の加算料金)
+    base_fare = 430  # 初乗り料金 (1.052kmまで)
+    additional_fare = 80  # 加算料金 (237mごとに80円)
+    additional_distance = max(0, distance_km - 1.052)  # 初乗りを超えた距離
+    additional_units = additional_distance / 0.237  # 237mごと
+    taxi_fee = base_fare + int(additional_units) * additional_fare  # 通常料金
+
+    # 深夜料金の計算 (22:00〜5:00の間は20%増し)
+    taxi_fee_midnight = taxi_fee * 1.2
+
+    # 現在時刻の取得または指定された時間を使用
+    if current_time is None:
+        current_time = datetime.now()
+
+    # 深夜料金が適用される場合は深夜料金も返す
+    if current_time.hour >= 22 or current_time.hour < 5:
+        return round(taxi_fee), round(taxi_fee_midnight)  # 両方の料金を返す
+    else:
+        return round(taxi_fee), None  # 通常料金のみ返す（深夜料金は適用されない）
 
 if uploaded_file and start_address:
     # 出発地点の緯度経度を取得
@@ -105,42 +128,4 @@ if uploaded_file and start_address:
 
             # 住所が見つからなかった人は1人で1台のタクシーを使用
             for person in people_without_coords:
-                groups[len(groups)] = [person]
-
-            # タクシー割り当て
-            taxis = []
-            for group in groups.values():
-                for i in range(0, len(group), 3):
-                    taxis.append(group[i:i+3])  # 最大3人までのグループをタクシーに割り当て
-
-            # 結果を表示
-            result_data = []
-            for i, taxi in enumerate(taxis):
-                for passenger in taxi:
-                    result_data.append({
-                        "Taxi": i + 1,
-                        "Name": passenger['name'],
-                        "Address": passenger['address']
-                    })
-
-            # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
-            def extract_area(address):
-                match = re.search(r'(\S+区|\S+町|\S+市)', address)
-                if match:
-                    return match.group(1)
-                return None
-
-            # 並び替えのロジックを追加
-            for passenger in result_data:
-                passenger["Area"] = extract_area(passenger["Address"])
-
-            # Taxiごとに並び替え（「Taxi」->「Area」）
-            result_data_sorted = sorted(result_data, key=lambda x: (x["Taxi"], x["Area"]))
-
-            # 結果をエクセルファイルとして出力
-            if st.button("結果をエクセルファイルとしてダウンロード"):
-                result_df = pd.DataFrame(result_data_sorted)
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    result_df.to_excel(writer, index=False, sheet_name='Taxis')
-                st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
+                groups[len(groups)] = [perso
