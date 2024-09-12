@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも4🚕👫")
+st.title("あいのりタクシーアプリ_タクとも🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -28,6 +28,7 @@ def geocode_with_retry(address):
         if data:
             # 緯度経度を取得
             coordinates = data[0]["geometry"]["coordinates"]
+            st.write(f"{address}の座標: {coordinates}")  # デバッグ出力
             return coordinates  # GSIは経度、緯度の順で返すことが多い
         else:
             st.write(f"住所 '{address}' が見つかりませんでした。")
@@ -79,6 +80,8 @@ if uploaded_file and start_address:
     start_coords = get_start_coords(start_address)
     if start_coords is None:
         st.stop()  # 出発地点の座標が取得できない場合、処理を停止
+
+    st.write(f"出発地点の座標: {start_coords}")  # デバッグ出力
 
     # Excelファイルの読み込み
     df = pd.read_excel(uploaded_file)
@@ -159,7 +162,9 @@ if uploaded_file and start_address:
                 # 座標が有効か確認
                 if is_valid_coordinates(passenger["coords"]):
                     distance = geodesic((start_coords[1], start_coords[0]), (passenger["coords"][1], passenger["coords"][0])).km
+                    st.write(f"{passenger['name']}との距離: {distance} km")  # デバッグ出力
                     taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
+                    st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ出力
                     if taxi_fee_midnight:
                         result_data.append({
                             "Taxi": i + 1,
