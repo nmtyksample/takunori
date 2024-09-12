@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも26🚕👫")
+st.title("あいのりタクシーアプリ_タクとも27🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -27,8 +27,8 @@ def geocode_with_retry(address):
         data = response.json()
         if data:
             coordinates = data[0]["geometry"]["coordinates"]
-            st.write(f"{address} の座標: {coordinates}")  # デバッグ出力
-            return coordinates  # GSIは経度、緯度の順で返すことが多い
+            st.write(f"{address} の座標: 経度: {coordinates[0]}, 緯度: {coordinates[1]}")  # 経度と緯度を正しい順序で表示
+            return coordinates  # GSIは経度、緯度の順で返す
         else:
             st.write(f"住所 '{address}' が見つかりませんでした。")
             return None
@@ -58,7 +58,7 @@ def calculate_taxi_fare(distance_km, current_time=None):
 def is_valid_coordinates(coords):
     if coords is None:
         return False
-    # GSIから返される座標は経度、緯度の順なので、緯度、経度の順に入れ替えてから処理
+    # 緯度と経度を正しい順序で出力
     latitude, longitude = coords[1], coords[0]
     st.write(f"Checking coordinates: 緯度: {latitude}, 経度: {longitude}")  # 正しい順序でデバッグ出力
     return -90 <= latitude <= 90 and -180 <= longitude <= 180
@@ -81,7 +81,7 @@ if uploaded_file and start_address:
     if start_coords is None:
         st.stop()  # 出発地点の座標が取得できない場合、処理を停止
 
-    st.write(f"出発地点の座標: {start_coords}")  # デバッグ出力
+    st.write(f"出発地点の座標: 経度: {start_coords[0]}, 緯度: {start_coords[1]}")  # 正しい順序で出力
 
     # Excelファイルの読み込み
     df = pd.read_excel(uploaded_file)
