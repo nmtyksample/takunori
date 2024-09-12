@@ -34,7 +34,7 @@ def geocode_with_retry(address):
             st.write(f"住所 '{address}' が見つかりませんでした。")
             return None
     else:
-        st.write("APIリクエストに失敗しました。")
+        st.write(f"APIリクエストに失敗しました。ステータスコード: {response.status_code}")
         return None
 
 # タクシー料金計算の関数
