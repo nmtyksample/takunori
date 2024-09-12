@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも25🚕👫")
+st.title("あいのりタクシーアプリ_タクとも26🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -178,4 +178,38 @@ if uploaded_file and start_address:
                         result_data.append({
                             "Taxi": i + 1,
                             "Name": passenger['name'],
-                           
+                            "Address": passenger['address'],
+                            "Taxi Fee (Normal)": "N/A",
+                            "Taxi Fee (Midnight)": "N/A"
+                        })
+                else:
+                    st.write(f"Invalid coordinates for {passenger['name']}: {passenger['coords']}")  # デバッグ出力
+                    result_data.append({
+                        "Taxi": i + 1,
+                        "Name": passenger['name'],
+                        "Address": passenger['address'],
+                        "Taxi Fee (Normal)": "N/A",
+                        "Taxi Fee (Midnight)": "N/A"
+                    })
+
+        # 住所から「区」や「町」を抽出する関数（どの地域でも対応）
+        def extract_area(address):
+            match = re.search(r'(\S+区|\S+町|\S+市)', address)
+            if match:
+                return match.group(1)
+            return None
+
+        # 並び替えのロジックを追加
+        for passenger in result_data:
+            passenger["Area"] = extract_area(passenger["Address"])
+
+        # Taxiごとに並び替え（「Taxi」->「Area」）
+        result_data_sorted = sorted(result_data, key=lambda x: (x["Taxi"], x["Area"]))
+
+        # 結果をエクセルファイルとして出力
+        if st.button("結果をエクセルファイルとしてダウンロード"):
+            result_df = pd.DataFrame(result_data_sorted)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                result_df.to_excel(writer, index=False, sheet_name='Taxis')
+            st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
