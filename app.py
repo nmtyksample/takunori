@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも30🚕👫")
+st.title("あいのりタクシーアプリ_タクとも31🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -60,7 +60,7 @@ def is_valid_coordinates(coords):
     if coords is None:
         return False
     # 緯度と経度を正しい順序で出力
-    latitude, longitude = coords[1], coords[0]
+    latitude, longitude = coords[0], coords[1]
     st.write(f"Checking coordinates: 緯度: {latitude}, 経度: {longitude}")  # 正しい順序でデバッグ出力
     return -90 <= latitude <= 90 and -180 <= longitude <= 180
 
@@ -101,7 +101,7 @@ if uploaded_file and start_address:
         }
         location = geocode_with_retry(person["address"])
         if is_valid_coordinates(location):
-            person["coords"] = (location[1], location[0])  # 緯度と経度を正しい順序で保存
+            person["coords"] = (location[0], location[1])  # 緯度と経度を正しい順序で保存
         else:
             st.write(f"Error: Could not geocode address for {person['name']} - {person['address']}")
             person["coords"] = None  # 座標が見つからなかった場合
