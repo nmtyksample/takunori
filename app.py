@@ -161,27 +161,38 @@ if uploaded_file and start_address:
             for passenger in taxi:
                 # 座標が有効か確認
                 if is_valid_coordinates(passenger["coords"]):
-                    distance = geodesic((start_coords[1], start_coords[0]), (passenger["coords"][1], passenger["coords"][0])).km
-                    st.write(f"{passenger['name']}との距離: {distance} km")  # デバッグ出力
-                    taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
-                    st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ出力
-                    if taxi_fee_midnight:
+                    try:
+                        distance = geodesic((start_coords[1], start_coords[0]), (passenger["coords"][1], passenger["coords"][0])).km
+                        st.write(f"{passenger['name']}との距離: {distance} km")  # デバッグ出力
+                        taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
+                        st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ出力
+                        if taxi_fee_midnight:
+                            result_data.append({
+                                "Taxi": i + 1,
+                                "Name": passenger['name'],
+                                "Address": passenger['address'],
+                                "Taxi Fee (Normal)": f"{taxi_fee}円",
+                                "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円"
+                            })
+                        else:
+                            result_data.append({
+                                "Taxi": i + 1,
+                                "Name": passenger['name'],
+                                "Address": passenger['address'],
+                                "Taxi Fee (Normal)": f"{taxi_fee}円",
+                                "Taxi Fee (Midnight)": "N/A"
+                            })
+                    except Exception as e:
+                        st.write(f"Error calculating distance or fare for {passenger['name']}: {e}")  # デバッグ用エラーログ
                         result_data.append({
                             "Taxi": i + 1,
                             "Name": passenger['name'],
                             "Address": passenger['address'],
-                            "Taxi Fee (Normal)": f"{taxi_fee}円",
-                            "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円"
-                        })
-                    else:
-                        result_data.append({
-                            "Taxi": i + 1,
-                            "Name": passenger['name'],
-                            "Address": passenger['address'],
-                            "Taxi Fee (Normal)": f"{taxi_fee}円",
+                            "Taxi Fee (Normal)": "N/A",
                             "Taxi Fee (Midnight)": "N/A"
                         })
                 else:
+                    st.write(f"Invalid coordinates for {passenger['name']}: {passenger['coords']}")  # デバッグ出力
                     result_data.append({
                         "Taxi": i + 1,
                         "Name": passenger['name'],
