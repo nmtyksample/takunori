@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも24🚕👫")
+st.title("あいのりタクシーアプリ_タクとも25🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -26,7 +26,6 @@ def geocode_with_retry(address):
     if response.status_code == 200:
         data = response.json()
         if data:
-            # 緯度経度を取得
             coordinates = data[0]["geometry"]["coordinates"]
             st.write(f"{address} の座標: {coordinates}")  # デバッグ出力
             return coordinates  # GSIは経度、緯度の順で返すことが多い
@@ -69,7 +68,6 @@ def get_start_coords(start_address):
     coords = geocode_with_retry(start_address)
     if not is_valid_coordinates(coords):
         st.write("入力された住所の座標が見つかりませんでした。デフォルトの座標を使用します。")
-        # デフォルトの座標（東京都渋谷区神南2-2-1）を取得
         default_address = "東京都渋谷区神南2-2-1"
         coords = geocode_with_retry(default_address)
         if not is_valid_coordinates(coords):
@@ -102,8 +100,7 @@ if uploaded_file and start_address:
         }
         location = geocode_with_retry(person["address"])
         if is_valid_coordinates(location):
-            # 緯度経度を正しい順序（緯度、経度）で保存
-            person["coords"] = (location[1], location[0])
+            person["coords"] = (location[1], location[0])  # 緯度と経度を正しい順序で保存
         else:
             st.write(f"Error: Could not geocode address for {person['name']} - {person['address']}")
             person["coords"] = None  # 座標が見つからなかった場合
@@ -135,12 +132,12 @@ if uploaded_file and start_address:
             # グループ分け
             groups = {}
             for idx, cluster_id in enumerate(clusters):
-                if cluster_id != -1:  # -1はノイズ（どのクラスタにも属さない）
+                if cluster_id != -1:  # -1はノイズ
                     if cluster_id not in groups:
                         groups[cluster_id] = []
                     groups[cluster_id].append(people_with_coords[idx])
 
-            # 残ったノイズの処理（個別タクシー）
+            # 残ったノイズの処理
             noise = [people_with_coords[idx] for idx, cluster_id in enumerate(clusters) if cluster_id == -1]
             for person in noise:
                 groups[len(groups)] = [person]
@@ -169,10 +166,16 @@ if uploaded_file and start_address:
                         st.write(f"{passenger['name']}との距離: {distance} km")  # デバッグ出力
                         taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
                         st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")  # デバッグ出力
-                        if taxi_fee_midnight:
-                            result_data.append({
-                                "Taxi": i + 1,
-                                "Name": passenger['name'],
-                                "Address": passenger['address'],
-                                "Taxi Fee (Normal)": f"{taxi_fee}円",
-                                "Taxi Fee (Midnight)":
+                        result_data.append({
+                            "Taxi": i + 1,
+                            "Name": passenger['name'],
+                            "Address": passenger['address'],
+                            "Taxi Fee (Normal)": f"{taxi_fee}円",
+                            "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円" if taxi_fee_midnight else "N/A"
+                        })
+                    except Exception as e:
+                        st.write(f"Error calculating distance or fare for {passenger['name']}: {e}")  # エラーログ
+                        result_data.append({
+                            "Taxi": i + 1,
+                            "Name": passenger['name'],
+                           
