@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ_タクとも15🚕👫")
+st.title("あいのりタクシーアプリ_タクとも16🚕👫")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -59,7 +59,10 @@ def calculate_taxi_fare(distance_km, current_time=None):
 def is_valid_coordinates(coords):
     if coords is None:
         return False
-    longitude, latitude = coords  # GSIの座標は経度、緯度の順なので修正
+    # 経度、緯度を表示してデバッグ
+    longitude, latitude = coords  
+    st.write(f"Checking coordinates: 緯度: {latitude}, 経度: {longitude}")  # デバッグ出力
+    # 緯度が-90から90、経度が-180から180の範囲内であることを確認
     return -90 <= latitude <= 90 and -180 <= longitude <= 180
 
 # 住所の座標が不明な場合はデフォルト住所の座標を使用する関数
