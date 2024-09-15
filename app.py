@@ -55,13 +55,15 @@ def calculate_taxi_fare(distance_km, current_time=None):
 
     taxi_fee_midnight = taxi_fee * 1.2  # 深夜料金 (22:00〜5:00)
 
-    if current_time is None:
-        current_time = datetime.now()
+    # if current_time is None:
+    #     current_time = datetime.now()
 
-    if current_time.hour >= 22 or current_time.hour < 5:
-        return round(taxi_fee), round(taxi_fee_midnight)
-    else:
-        return round(taxi_fee), None
+    return round(taxi_fee), round(taxi_fee_midnight)
+
+    # if current_time.hour >= 22 or current_time.hour < 5:
+    #     return round(taxi_fee), round(taxi_fee_midnight)
+    # else:
+    #     return round(taxi_fee), None
 
 # 住所の座標が不明な場合はデフォルト住所の座標を使用する関数
 def get_start_coords(start_address):
