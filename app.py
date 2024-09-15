@@ -47,10 +47,10 @@ def get_route_distance(start, end, api_key):
 
 # タクシー料金計算の関数
 def calculate_taxi_fare(distance_km, current_time=None):
-    base_fare = 430  # 初乗り料金 (1.052kmまで)
-    additional_fare = 80  # 加算料金 (237mごとに80円)
-    additional_distance = max(0, distance_km - 1.052)  # 初乗りを超えた距離
-    additional_units = additional_distance / 0.237  # 237mごと
+    base_fare = 500  # 初乗り料金 (1.096kmまで)
+    additional_fare = 100  # 加算料金 (255mごとに100円)
+    additional_distance = max(0, distance_km - 1.096)  # 初乗りを超えた距離
+    additional_units = additional_distance / 0.255  # 255mごと
     taxi_fee = base_fare + int(additional_units) * additional_fare  # 通常料金
 
     taxi_fee_midnight = taxi_fee * 1.2  # 深夜料金 (22:00〜5:00)
