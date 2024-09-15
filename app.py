@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import requests
 from sklearn.cluster import DBSCAN
+from geopy.distance import geodesic
 import io
 import re
 from datetime import datetime
-
 from dotenv import load_dotenv
 import os
+import numpy as np
 
 # タイトルの設定
 st.title("あいのりタクシーアプリ_タクとも_api1🚕👫")
@@ -55,15 +56,7 @@ def calculate_taxi_fare(distance_km, current_time=None):
 
     taxi_fee_midnight = taxi_fee * 1.2  # 深夜料金 (22:00〜5:00)
 
-    # if current_time is None:
-    #     current_time = datetime.now()
-
     return round(taxi_fee), round(taxi_fee_midnight)
-
-    # if current_time.hour >= 22 or current_time.hour < 5:
-    #     return round(taxi_fee), round(taxi_fee_midnight)
-    # else:
-    #     return round(taxi_fee), None
 
 # 住所の座標が不明な場合はデフォルト住所の座標を使用する関数
 def get_start_coords(start_address):
@@ -97,48 +90,61 @@ if uploaded_file and start_address and api_key:
     if len(people) < 1:
         st.error("十分な住所データが取得できませんでした。")
     else:
-        # 結果を表示
-        result_data = []
-        for i, person in enumerate(people):
+        # ルート距離を取得し、各人の座標をリストに追加
+        people_with_coords = []
+        for person in people:
             distance = get_route_distance(start_coords, person["address"], api_key)
             if distance is not None:
-                taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
-                st.write(f"{person['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")
-                result_data.append({
-                    "Taxi": i + 1,
-                    "Name": person['name'],
-                    "Address": person['address'],
-                    "Taxi Fee (Normal)": f"{taxi_fee}円",
-                    "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円" if taxi_fee_midnight else "N/A"
-                })
+                people_with_coords.append((person, distance))
             else:
                 st.write(f"{person['name']}の距離を計算できませんでした。")
-                result_data.append({
-                    "Taxi": i + 1,
-                    "Name": person['name'],
-                    "Address": person['address'],
-                    "Taxi Fee (Normal)": "N/A",
-                    "Taxi Fee (Midnight)": "N/A"
-                })
+        
+        if len(people_with_coords) < 2:
+            st.error("十分な住所データが取得できませんでした。")
+        else:
+            # 座標のリストを作成
+            coords = [get_route_distance(start_coords, p["address"], api_key) for p, _ in people_with_coords]
+            
+            # 距離行列を計算 (DBSCANクラスタリング用)
+            dist_matrix = np.array([[geodesic(c1, c2).km for c2 in coords] for c1 in coords])
 
-        # 住所から「区」や「町」を抽出する関数
-        def extract_area(address):
-            match = re.search(r'(\S+区|\S+町|\S+市)', address)
-            if match:
-                return match.group(1)
-            return None
+            # DBSCANでクラスタリング
+            epsilon = 2  # 2km以内の点を同じクラスタと見なす
+            dbscan = DBSCAN(eps=epsilon, min_samples=2, metric="precomputed")
+            clusters = dbscan.fit_predict(dist_matrix)
 
-        # 並び替えのロジックを追加
-        for person in result_data:
-            person["Area"] = extract_area(person["Address"])
+            # グループ分け
+            groups = {}
+            for idx, cluster_id in enumerate(clusters):
+                if cluster_id != -1:  # -1はノイズ
+                    if cluster_id not in groups:
+                        groups[cluster_id] = []
+                    groups[cluster_id].append(people_with_coords[idx])
 
-        # Taxiごとに並び替え（「Taxi」->「Area」）
-        result_data_sorted = sorted(result_data, key=lambda x: (x["Taxi"], x["Area"]))
+            # タクシーに割り当てる（最大3人まで）
+            taxis = []
+            for group in groups.values():
+                for i in range(0, len(group), 3):
+                    taxis.append(group[i:i+3])  # 3人ごとにタクシーに割り当て
 
-        # 結果をエクセルファイルとして出力
-        if st.button("結果をエクセルファイルとしてダウンロード"):
-            result_df = pd.DataFrame(result_data_sorted)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                result_df.to_excel(writer, index=False, sheet_name='Taxis')
-            st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
+            # 結果を表示
+            result_data = []
+            for i, taxi in enumerate(taxis):
+                for passenger, distance in taxi:
+                    taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
+                    st.write(f"{passenger['name']}のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")
+                    result_data.append({
+                        "Taxi": i + 1,
+                        "Name": passenger['name'],
+                        "Address": passenger['address'],
+                        "Taxi Fee (Normal)": f"{taxi_fee}円",
+                        "Taxi Fee (Midnight)": f"{taxi_fee_midnight}円" if taxi_fee_midnight else "N/A"
+                    })
+
+            # 結果をエクセルファイルとして出力
+            if st.button("結果をエクセルファイルとしてダウンロード"):
+                result_df = pd.DataFrame(result_data)
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    result_df.to_excel(writer, index=False, sheet_name='Taxis')
+                st.download_button(label="Download Excel", data=output.getvalue(), file_name="taxi_results.xlsx")
