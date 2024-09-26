@@ -3,15 +3,15 @@ import pandas as pd
 import requests
 from sklearn.cluster import DBSCAN
 import io
-import re
 from datetime import datetime
 from geopy.distance import geodesic, Point
 from dotenv import load_dotenv
 import os
 import numpy as np
+from googlemaps import convert
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ___x1🚕👫")
+st.title("あいのりタクシーアプリ🚕👫　　タクともver2.0")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -21,9 +21,6 @@ load_dotenv()
 
 # Google Maps APIキーの読み込み
 api_key = os.getenv("MAP_KEY")
-
-if not api_key:
-    st.error("Google Maps APIキーが設定されていません。")
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("Excelファイルをアップロードしてください", type=["xlsx"])
@@ -36,12 +33,10 @@ max_api_access = 100
 def geocode_address(address, api_key):
     global api_access_count
     if api_access_count >= max_api_access:
-        st.error("APIアクセス回数が100回を超えました。処理を停止します。")
         return None
     url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key={api_key}"
     response = requests.get(url)
     api_access_count += 1
-    st.write(f"{api_access_count}回目のAPIアクセス: {address}")
     
     if response.status_code == 200:
         data = response.json()
@@ -49,10 +44,8 @@ def geocode_address(address, api_key):
             location = data['results'][0]['geometry']['location']
             return (location['lat'], location['lng'])  # 緯度・経度を返す
         else:
-            st.error(f"住所が見つかりませんでした: {address}")
             return None
     else:
-        st.error(f"APIリクエストに失敗しました。ステータスコード: {response.status_code}")
         return None
 
 # タクシー料金計算の関数
@@ -67,7 +60,6 @@ def calculate_taxi_fare(distance_km):
 
 # クラスタリングのための距離行列を作成
 def create_clusters(people, coords):
-    st.write("距離行列の計算")
     dist_matrix = np.array([
         [
             geodesic(Point(c1), Point(c2)).km if c1 and c2 else float('inf')
@@ -79,25 +71,125 @@ def create_clusters(people, coords):
     clusters = dbscan.fit_predict(dist_matrix)
     return clusters
 
+def decode_polyline(encoded_polyline):
+    """エンコードされたポリラインをデコードしてリスト形式に変換する"""
+    return convert.decode_polyline(encoded_polyline)
+
+def are_routes_similar(start, dest1, dest2, api_key):
+    url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"
+    }
+
+    # dest1の座標を取得
+    dest1_location = geocode_address(dest1, api_key)
+    if not dest1_location:
+        print(f"目的地1の座標が取得できませんでした: {dest1}")
+        return False
+
+    # dest2の座標を取得
+    dest2_location = geocode_address(dest2, api_key)
+    if not dest2_location:
+        print(f"目的地2の座標が取得できませんでした: {dest2}")
+        return False
+
+    # ペイロード1（dest1へのルート）
+    payload1 = {
+        "origin": {
+            "location": {
+                "lat_lng": {
+                    "latitude": start[0],  # 緯度
+                    "longitude": start[1]  # 経度
+                }
+            }
+        },
+        "destination": {
+            "location": {
+                "lat_lng": {
+                    "latitude": dest1_location[0],  # 緯度
+                    "longitude": dest1_location[1]  # 経度
+                }
+            }
+        },
+        "travel_mode": "DRIVE",
+        "routing_preference": "TRAFFIC_AWARE"
+    }
+
+    # ペイロード2（dest2へのルート）
+    payload2 = {
+        "origin": {
+            "location": {
+                "lat_lng": {
+                    "latitude": start[0],  # 緯度
+                    "longitude": start[1]  # 経度
+                }
+            }
+        },
+        "destination": {
+            "location": {
+                "lat_lng": {
+                    "latitude": dest2_location[0],  # 緯度
+                    "longitude": dest2_location[1]  # 経度
+                }
+            }
+        },
+        "travel_mode": "DRIVE",
+        "routing_preference": "TRAFFIC_AWARE"
+    }
+
+    # APIリクエストを送信して、レスポンスを取得
+    response1 = requests.post(url, json=payload1, headers=headers)
+    response2 = requests.post(url, json=payload2, headers=headers)
+
+    # レスポンスのステータスコードを確認
+    if response1.status_code == 200 and response2.status_code == 200:
+        data1 = response1.json()
+        data2 = response2.json()
+
+        if 'routes' not in data1 or 'routes' not in data2 or not data1['routes'] or not data2['routes']:
+            print(f"ルートが見つかりませんでした: {dest1} または {dest2}")
+            return False
+
+        # 各ルートのポリラインをデコードしてステップに分解
+        route1_polyline = data1['routes'][0]['polyline']['encodedPolyline']
+        route2_polyline = data2['routes'][0]['polyline']['encodedPolyline']
+
+        # ポリラインをデコードして座標リストに変換
+        route1_steps = decode_polyline(route1_polyline)
+        route2_steps = decode_polyline(route2_polyline)
+
+        # ステップを比較してルートが似ているかをチェック
+        similar_step_count = 0
+        for step1, step2 in zip(route1_steps, route2_steps):
+            # ステップの終点（座標）が近いかどうかを判定
+            if geodesic(
+                (step1['lat'], step1['lng']),
+                (step2['lat'], step2['lng'])
+            ).km < 0.1:  # 100m以内なら同じステップとみなす
+                similar_step_count += 1
+
+        # 少なくとも50％のステップが類似していればルートは同じとみなす
+        min_similar_steps = int(0.5 * min(len(route1_steps), len(route2_steps)))
+        similar = similar_step_count >= min_similar_steps
+        print(f"ルートが類似しているか: {similar}")
+        return similar
+    else:
+        print(f"ルートが見つかりませんでした。レスポンスコード: {response1.status_code} {response2.status_code}")
+        return False
+
+
 # 住所の座標が不明な場合はデフォルト住所の座標を使用する関数
 def get_start_coords(start_address, api_key):
     return geocode_address(start_address, api_key)
 
 if uploaded_file and start_address and api_key:
-    st.write("出発地点の住所を取得")
     start_coords = get_start_coords(start_address, api_key)
 
     # Excelファイルの読み込み
-    st.write("Excelファイルの読み込み")
     df = pd.read_excel(uploaded_file)
 
-    # プログレスバーの設定
-    st.write("プログレスバーの設定")
-    progress_bar = st.progress(0)
-    total_steps = len(df)
-    current_step = 0
-
-    st.write("Excelファイルから住所データを取得して処理")
     people = []
     coords = []  # 座標リスト
     invalid_addresses = []  # 無効な住所リスト
@@ -106,7 +198,6 @@ if uploaded_file and start_address and api_key:
             "name": row["Name"],  # "Name"列から取得
             "address": row["Address"]  # "Address"列から取得
         }
-        st.write(f"データ: {person['name']} - {person['address']}")
         people.append(person)
 
         # 住所の座標を取得
@@ -116,23 +207,75 @@ if uploaded_file and start_address and api_key:
         else:
             coords.append(None)  # 座標が取得できなかった場合はNone
             invalid_addresses.append(person)  # 無効な住所リストに追加
-        current_step += 1
-        progress_bar.progress(current_step / total_steps)
 
     if len(people) < 1:
-        st.error("十分な住所データが取得できませんでした。")
+        print("十分な住所データが取得できませんでした。")
     else:
         # 無効な住所を除いてクラスタリング実行
         valid_people = [person for person, coord in zip(people, coords) if coord is not None]
         valid_coords = [coord for coord in coords if coord is not None]
         clusters = create_clusters(valid_people, valid_coords)
         
+        # クラスタごとに人をまとめる
         taxi_groups = {}
+        excluded_people = []
         for i, cluster_id in enumerate(clusters):
             if cluster_id != -1:
                 if cluster_id not in taxi_groups:
                     taxi_groups[cluster_id] = []
-                taxi_groups[cluster_id].append(valid_people[i])
+                if len(taxi_groups[cluster_id]) < 3:  # タクシーに3人まで乗れるようにする
+                    taxi_groups[cluster_id].append(valid_people[i])
+                else:
+                    excluded_people.append(valid_people[i])  # 3人以上のグループは除外
+            else:
+                excluded_people.append(valid_people[i])  # クラスタIDが-1（未分類）の場合は除外
+
+        # 除外された人を既存のタクシーグループに追加
+        for person in excluded_people:
+            added_to_group = False
+            for cluster_id, group in taxi_groups.items():
+                if len(group) < 3:
+                    if are_routes_similar(start_coords, group[0]['address'], person['address'], api_key):
+                        taxi_groups[cluster_id].append(person)
+                        added_to_group = True
+                        break
+            if not added_to_group:
+                print(f"除外された人: {person['name']} - {person['address']}")
+
+        # 新しく除外された人同士をグループ化するロジック
+        new_group_id = max(taxi_groups.keys(), default=0) + 1
+
+        # 各人がどのタクシーグループに属しているかを追跡する辞書
+        person_to_group = {person['name']: None for person in excluded_people}
+
+        for i in range(len(excluded_people)):
+            for j in range(i + 1, len(excluded_people)):
+                if are_routes_similar(start_coords, excluded_people[i]['address'], excluded_people[j]['address'], api_key):
+                    # どちらの人もまだどのグループにも属していない場合
+                    if person_to_group[excluded_people[i]['name']] is None and person_to_group[excluded_people[j]['name']] is None:
+                        # 新しいグループを作成して両方追加
+                        if new_group_id not in taxi_groups:
+                            taxi_groups[new_group_id] = []
+                        if len(taxi_groups[new_group_id]) < 3:  # グループに3人以上追加しないように制限
+                            taxi_groups[new_group_id].append(excluded_people[i])
+                            taxi_groups[new_group_id].append(excluded_people[j])
+                            person_to_group[excluded_people[i]['name']] = new_group_id
+                            person_to_group[excluded_people[j]['name']] = new_group_id
+                    elif person_to_group[excluded_people[i]['name']] is None:
+                        # excluded_people[i]だけがグループに所属していない場合
+                        group_id = person_to_group[excluded_people[j]['name']]
+                        if len(taxi_groups[group_id]) < 3:
+                            taxi_groups[group_id].append(excluded_people[i])
+                            person_to_group[excluded_people[i]['name']] = group_id
+                    elif person_to_group[excluded_people[j]['name']] is None:
+                        # excluded_people[j]だけがグループに所属していない場合
+                        group_id = person_to_group[excluded_people[i]['name']]
+                        if len(taxi_groups[group_id]) < 3:
+                            taxi_groups[group_id].append(excluded_people[j])
+                            person_to_group[excluded_people[j]['name']] = group_id
+                    # すでに両方の人が異なるグループに属している場合、何もしない
+            new_group_id += 1
+
 
         # グループを3人ずつに分割して表示
         result_data = []
@@ -143,7 +286,6 @@ if uploaded_file and start_address and api_key:
                 for person in sub_group:
                     distance = geodesic(start_coords, geocode_address(person["address"], api_key)).km
                     taxi_fee, taxi_fee_midnight = calculate_taxi_fare(distance)
-                    st.write(f"{person['name']} ({taxi_group}) のタクシー料金: {taxi_fee}円, 深夜料金: {taxi_fee_midnight if taxi_fee_midnight else 'N/A'}")
                     result_data.append({
                         "Taxi": taxi_group,
                         "Name": person['name'],
@@ -154,7 +296,6 @@ if uploaded_file and start_address and api_key:
 
         # 無効な住所を結果の最後に追加
         for person in invalid_addresses:
-            st.write(f"無効な住所: {person['name']} - {person['address']}")
             result_data.append({
                 "Taxi": "N/A",
                 "Name": person['name'],
@@ -175,3 +316,5 @@ if uploaded_file and start_address and api_key:
                 file_name="taxi_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+else:
+    st.info("出発地点とファイルをアップロードしてください。")
