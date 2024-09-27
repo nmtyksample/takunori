@@ -43,9 +43,6 @@ if not st.session_state.authenticated:
         else:
             st.error("ユーザー名またはパスワードが違います")
 else:
-    # 認証に成功した場合の内容を表示
-    st.write("認証に成功しました。この内容は認証後のみ表示されます。")
-
     # タイトルの設定
     st.title("あいのりタクシーアプリ🚕👫　　タクともver3.6")
 
