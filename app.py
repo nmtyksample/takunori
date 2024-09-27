@@ -41,12 +41,14 @@ if not st.session_state.authenticated:
             st.experimental_rerun()  # 認証成功後にリロード
         else:
             st.error("ユーザー名またはパスワードが違います")
-else:
+
+# 認証が成功している場合の処理
+if st.session_state.authenticated:
     # 認証に成功した場合の内容を表示
     st.write("認証に成功しました。この内容は認証後のみ表示されます。")
 
     # タイトルの設定
-    st.title("あいのりタクシーアプリ🚕👫　　タクともver3.0")
+    st.title("あいのりタクシーアプリ🚕👫　　タクともver3.2")
 
     # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
     start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
