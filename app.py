@@ -179,20 +179,23 @@ def are_routes_similar(start, dest1, dest2, api_key):
         print(f"ルートが見つかりませんでした。レスポンスコード: {response1.status_code} {response2.status_code}")
         return False
 
-
 # 住所の座標が不明な場合はデフォルト住所の座標を使用する関数
 def get_start_coords(start_address, api_key):
     return geocode_address(start_address, api_key)
 
-if uploaded_file and start_address and api_key:
-    start_coords = get_start_coords(start_address, api_key)
-
-    # Excelファイルの読み込み
-    df = pd.read_excel(uploaded_file)
+# メイン処理の結果をキャッシュして保存
+@st.cache_data
+def process_excel_data(start_coords, df):
+    global api_access_count
 
     people = []
     coords = []  # 座標リスト
     invalid_addresses = []  # 無効な住所リスト
+    
+    # プログレスバーの設定
+    progress_bar = st.progress(0)
+    total_steps = len(df)
+
     for index, row in df.iterrows():
         person = {
             "name": row["Name"],  # "Name"列から取得
@@ -208,13 +211,21 @@ if uploaded_file and start_address and api_key:
             coords.append(None)  # 座標が取得できなかった場合はNone
             invalid_addresses.append(person)  # 無効な住所リストに追加
 
+        # プログレスバーの更新
+        progress_bar.progress((index + 1) / total_steps)
+
     if len(people) < 1:
         print("十分な住所データが取得できませんでした。")
+        return None, None, None, None
     else:
         # 無効な住所を除いてクラスタリング実行
         valid_people = [person for person, coord in zip(people, coords) if coord is not None]
         valid_coords = [coord for coord in coords if coord is not None]
-        clusters = create_clusters(valid_people, valid_coords)
+        
+        if len(valid_people) > 1:
+            clusters = create_clusters(valid_people, valid_coords)
+        else:
+            clusters = [-1] * len(valid_people)  # クラスタリングできない場合は全て未分類とする
         
         # クラスタごとに人をまとめる
         taxi_groups = {}
@@ -276,7 +287,18 @@ if uploaded_file and start_address and api_key:
                     # すでに両方の人が異なるグループに属している場合、何もしない
             new_group_id += 1
 
+        # 最終的な結果を返す
+        return taxi_groups, valid_people, invalid_addresses, start_coords
 
+# キャッシュされたデータを読み込む
+if uploaded_file and start_address and api_key:
+    start_coords = get_start_coords(start_address, api_key)
+    df = pd.read_excel(uploaded_file)
+    
+    # メイン処理をキャッシュして実行
+    taxi_groups, valid_people, invalid_addresses, start_coords = process_excel_data(start_coords, df)
+
+    if taxi_groups is not None:
         # グループを3人ずつに分割して表示
         result_data = []
         for cluster_id, group in taxi_groups.items():
@@ -318,3 +340,4 @@ if uploaded_file and start_address and api_key:
             )
 else:
     st.info("出発地点とファイルをアップロードしてください。")
+
