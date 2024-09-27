@@ -5,10 +5,10 @@ from sklearn.cluster import DBSCAN
 import io
 from datetime import datetime
 from geopy.distance import geodesic, Point
-from dotenv import load_dotenv
 import os
 import numpy as np
 from googlemaps import convert
+
 st.markdown(
     """
     <style>
@@ -33,8 +33,8 @@ st.title("あいのりタクシーアプリ🚕👫　　タクともver3.0")
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
 
-# .envファイルを読み込む
-load_dotenv()
+# # .envファイルを読み込む
+# load_dotenv()
 
 # Google Maps APIキーの読み込み
 api_key = os.environ["MAP_KEY"]
