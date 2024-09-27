@@ -6,3 +6,4 @@ openpyxl
 googletrans
 google-cloud-translate
 xlsxwriter
+googlemaps
