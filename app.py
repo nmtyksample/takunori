@@ -38,12 +38,10 @@ if not st.session_state.authenticated:
     if st.button("ログイン"):
         if password == os.environ["PAS"]:
             st.session_state.authenticated = True
-            st.experimental_rerun()  # 認証成功後にリロード
+            st.success("認証に成功しました！")
         else:
             st.error("ユーザー名またはパスワードが違います")
-
-# 認証が成功している場合の処理
-if st.session_state.authenticated:
+else:
     # 認証に成功した場合の内容を表示
     st.write("認証に成功しました。この内容は認証後のみ表示されます。")
 
