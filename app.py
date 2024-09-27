@@ -9,9 +9,26 @@ from dotenv import load_dotenv
 import os
 import numpy as np
 from googlemaps import convert
+st.markdown(
+    """
+    <style>
+    /* エラーメッセージのz-indexを上げる */
+    .stAlert {
+        z-index: 9999;
+        position: relative;
+    }
+
+    /* プログレスバーのz-indexを下げる */
+    .stProgress > div > div {
+        z-index: 1;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # タイトルの設定
-st.title("あいのりタクシーアプリ🚕👫　　タクともver2.0")
+st.title("あいのりタクシーアプリ🚕👫　　タクともver3.0")
 
 # 出発地点の入力フォーム (デフォルトで渋谷のNHKの住所を設定)
 start_address = st.text_input("出発地点を入力してください", placeholder="東京都渋谷区神南2-2-1 NHK放送センター")
@@ -20,20 +37,21 @@ start_address = st.text_input("出発地点を入力してください", placeho
 load_dotenv()
 
 # Google Maps APIキーの読み込み
-api_key = os.getenv("MAP_KEY")
+api_key = os.environ["MAP_KEY"]
 
 # ファイルアップロード
 uploaded_file = st.file_uploader("Excelファイルをアップロードしてください", type=["xlsx"])
 
 # APIアクセス制限
 api_access_count = 0
-max_api_access = 100
+max_api_access = 500
 
 # Google Maps Geocoding APIを使用して住所から座標を取得する関数
 def geocode_address(address, api_key):
     global api_access_count
     if api_access_count >= max_api_access:
-        return None
+        st.error("APIアクセスが1000回を超えました。処理を中断します。")
+        st.stop()  # ストリームリットの処理を停止
     url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key={api_key}"
     response = requests.get(url)
     api_access_count += 1
@@ -76,6 +94,11 @@ def decode_polyline(encoded_polyline):
     return convert.decode_polyline(encoded_polyline)
 
 def are_routes_similar(start, dest1, dest2, api_key):
+    global api_access_count
+    if api_access_count >= max_api_access:
+        st.error("APIアクセスが1000回を超えました。処理を中断します。")
+        st.stop()  # ストリームリットの処理を停止
+
     url = "https://routes.googleapis.com/directions/v2:computeRoutes"
     headers = {
         "Content-Type": "application/json",
@@ -94,6 +117,9 @@ def are_routes_similar(start, dest1, dest2, api_key):
     if not dest2_location:
         print(f"目的地2の座標が取得できませんでした: {dest2}")
         return False
+
+    # APIアクセス数のカウントをインクリメント
+    api_access_count += 2
 
     # ペイロード1（dest1へのルート）
     payload1 = {
@@ -191,10 +217,6 @@ def process_excel_data(start_coords, df):
     people = []
     coords = []  # 座標リスト
     invalid_addresses = []  # 無効な住所リスト
-    
-    # プログレスバーの設定
-    progress_bar = st.progress(0)
-    total_steps = len(df)
 
     for index, row in df.iterrows():
         person = {
@@ -210,9 +232,6 @@ def process_excel_data(start_coords, df):
         else:
             coords.append(None)  # 座標が取得できなかった場合はNone
             invalid_addresses.append(person)  # 無効な住所リストに追加
-
-        # プログレスバーの更新
-        progress_bar.progress((index + 1) / total_steps)
 
     if len(people) < 1:
         print("十分な住所データが取得できませんでした。")
@@ -327,7 +346,7 @@ if uploaded_file and start_address and api_key:
             })
 
         # エクセルファイルに出力
-        if st.button("結果をエクセルファイルとしてダウンロード"):
+        if st.button("結果をファイル作成する"):
             result_df = pd.DataFrame(result_data)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -340,4 +359,3 @@ if uploaded_file and start_address and api_key:
             )
 else:
     st.info("出発地点とファイルをアップロードしてください。")
-
